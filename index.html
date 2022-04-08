@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+        .tiles{
+            width: 100px;
+            height: 100px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .tile{
+            width: 30px;
+            height: 30px;
+            background: blue;
+            cursor: pointer;
+        }
+        .user{
+            background: green;
+            pointer-events: none;
+        }
+        .computer{
+            background: yellow;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+<div>
+    Уровень компьютера: <span class="level">0</span>
+</div>
+<br>
+<div class="train" style="display: none;">
+    Ушел тренироваться...
+</div>
+<progress class="progress" value="0" max="10" style="display: none;"></progress>
+<div class="scores">
+    <span class="user-score">0</span> : <span class="computer-score">0</span>
+</div>
+<div class="tiles">
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+</div>
+<br>
+<div style="display: none;">
+    <button class="btn-move">Ибитэс много</button>
+    <button class="btn-move-one">Ибитэс раз</button>
+</div>
+<div>
+    <button class="btn-train">Отправить тренироваться</button>
+</div>
+<script>
+    const winCombinations = [
+        [0, 1, 2],
+        [3, 4, 5],
+        [6, 7, 8],
+        [0, 3, 6],
+        [1, 4, 7],
+        [2, 5, 8],
+        [0, 4, 8],
+        [2, 4, 6],
+    ];
+
+    const needCount = 3;
+
+    const Roles = {
+        USER: 'user',
+        COMPUTER: 'computer',
+    };
+
+    class Jarwis {
+        constructor(tiles, role) {
+            this.tiles = [...tiles];
+            this.restTiles = [...tiles];
+            this.choisedTiles = {
+                user: [],
+                computer: [],
+            };
+            this.role = role;
+            this.userScore = 0;
+            this.computerScore = 0;
+            this.goodNeuralConnections = [];
+            this.equalNeuralConnections = [];
+            this.badNeuralConnections = {};
+            this.neuralConnection = [];
+            this.endGame = false;
+            this.userScoreEl = document.querySelector('.user-score');
+            this.computerScoreEl = document.querySelector('.computer-score');
+        }
+
+        resetCounter() {
+            this.userScore = 0;
+            this.computerScore = 0;
+            this.userScoreEl.innerHTML = this.userScore;
+            this.computerScoreEl.innerHTML = this.computerScore;
+        }
+
+        _setTiles(tile, role) {
+            const indexTile = this.tiles.findIndex((item) => item === tile);
+            this.choisedTiles[role].push(indexTile);
+            this.restTiles = this.restTiles.filter((item) => item !== tile);
+            this.neuralConnection.push(indexTile);
+        }
+
+        _getRandomIndex(length) {
+            return Math.floor(Math.random() * length)
+        }
+
+        _getRandomIndexes(array) {
+            const indexes = [];
+            for (let i = 0; i < 10; i++) {
+                const index = this._getRandomIndex(array.length)
+                indexes.push(array[index]);
+            }
+            return indexes;
+        }
+
+        _getBadIndexes(connection) {
+            return this.badNeuralConnections[connection] || [];
+        }
+
+        _getGoodIndexes(connection, candidates) {
+            const goodIndexes = [];
+
+            candidates.forEach((index) => {
+                const keyConnection = connection ? `${connection},${index}` : `${index}`;
+                this.goodNeuralConnections.forEach((goodIndex) => {
+                    if (goodIndex.indexOf(keyConnection) === 0) {
+                        goodIndexes.push(index);
+                        goodIndexes.push(index);
+                    }
+                });
+                this.equalNeuralConnections.forEach((goodIndex) => {
+                    if (goodIndex.indexOf(keyConnection) === 0) {
+                        goodIndexes.push(index);
+                    }
+                })
+            });
+
+            return goodIndexes;
+        }
+
+        _getTileIndex(isTrain) {
+            const connection = this.neuralConnection.toString();
+            const badIndexes = this._getBadIndexes(connection);
+            const candidates = [];
+            const indexes = [];
+            this.restTiles.forEach((tile) => {
+                const index = this.tiles.findIndex((item) => item === tile);
+                if (!badIndexes.includes(index)) {
+                    candidates.push(index);
+                }
+                indexes.push(index);
+            });
+            const goodIndexes = this._getGoodIndexes(connection, candidates);
+            const allCandidates = [
+                ...candidates,
+                ...goodIndexes,
+            ];
+            let tile = null;
+            if (!isTrain) {
+                const tileIndexes = this._getRandomIndexes(allCandidates);
+                const counts = {};
+                tileIndexes.forEach((item) => {
+                    if (!counts[item]) {
+                        counts[item] = tileIndexes.filter((el) => el === item).length;
+                    }
+                });
+                let maxCount = 0;
+                let maxIndexCount = [];
+                Object.entries(counts).forEach((item) => {
+                    if (maxCount === item[1]) {
+                        maxIndexCount.push(item[0]);
+                    }
+                    if (maxCount < item[1]) {
+                        maxCount = item[1];
+                        maxIndexCount = [item[0]]
+                    }
+                });
+                let tileIndex = maxIndexCount[0];
+                if (maxIndexCount.length > 1) {
+                    tileIndex = maxIndexCount[this._getRandomIndex(maxIndexCount.length)];
+                }
+                tile = this.tiles[tileIndex];
+            } else {
+                const tileIndex = this._getRandomIndex(allCandidates.length);
+                tile = this.tiles[allCandidates[tileIndex]];
+            }
+
+            // console.log('allCandidates', badIndexes, indexes);
+            // console.log('badNeuralConnections', this.badNeuralConnections);
+            return this.restTiles.findIndex((item) => item === tile);
+        }
+
+        selfMove(log, isTrain = false) {
+            const index = this._getTileIndex(isTrain);
+            const tile = this.restTiles[index];
+            tile.classList.add(this.role);
+            this._setTiles(tile, this.role);
+            this.checkGameStatus(this.role);
+            if (this.endGame) {
+                this.restartGame(log);
+            }
+            return tile;
+        }
+
+        _checkWinCombinations(role) {
+            const roleTiles = this.choisedTiles[role];
+            let hasWin = false;
+            winCombinations.forEach((combination) => {
+                let curCount = 0;
+                combination.forEach((index) => {
+                    if (roleTiles.includes(index)) {
+                        curCount++;
+                    }
+                });
+                if (curCount === needCount) {
+                    hasWin = true;
+                }
+            });
+
+            return hasWin;
+        }
+
+        _onEndGame() {
+            this.endGame = true;
+            this.userScoreEl.innerHTML = this.userScore;
+            this.computerScoreEl.innerHTML = this.computerScore;
+        }
+
+        _addBadConnection(count) {
+            if (count > 4) {
+                console.log(count, this.neuralConnection.length);
+            }
+            const cloneConnection = [...this.neuralConnection];
+            const keyBadConnection = cloneConnection.splice(0, cloneConnection.length - count);
+            const badIndex = this.neuralConnection[this.neuralConnection.length - count];
+            const stringKeyBadConnection = keyBadConnection.toString();
+            if (this.badNeuralConnections[stringKeyBadConnection]) {
+                // if (badIndex === this.badNeuralConnections[stringKeyBadConnection][this.badNeuralConnections[stringKeyBadConnection].length - 1]) {
+                //     console.log(badIndex);
+                //     console.log(this.badNeuralConnections[stringKeyBadConnection]);
+                //     console.log(keyBadConnection);
+                //     console.log(this.tiles.length);
+                // }
+                // console.log(this.badNeuralConnections[stringKeyBadConnection].length
+                //     === this.tiles.length - keyBadConnection.length)
+                if (this.badNeuralConnections[stringKeyBadConnection].length
+                    === this.tiles.length - keyBadConnection.length) {
+                    this._addBadConnection(count + 2);
+                } else {
+                    this.badNeuralConnections[stringKeyBadConnection].push(badIndex);
+                    if (this.badNeuralConnections[stringKeyBadConnection].length
+                        === this.tiles.length - keyBadConnection.length) {
+                        this._addBadConnection(count + 2);
+                    }
+                }
+            } else {
+                this.badNeuralConnections[stringKeyBadConnection] = [badIndex];
+            }
+        }
+
+        checkGameStatus(role) {
+            const hasWin = this._checkWinCombinations(role);
+            const isEndGame = !this.restTiles.length || hasWin;
+
+            if (isEndGame) {
+                const connection = this.neuralConnection.toString();
+                const connections = !this.restTiles.length && !hasWin
+                    ? 'equalNeuralConnections'
+                    : role !== this.role && hasWin ? 'badNeuralConnections' : 'goodNeuralConnections';
+
+                if (connections === 'badNeuralConnections') {
+                    this._addBadConnection(2);
+                } else {
+                    this[connections].push(connection);
+                }
+            }
+            let statusWin = '';
+            if (hasWin) {
+                this[`${role}Score`]++;
+                statusWin = role;
+            }
+            if (!this.restTiles.length && !hasWin) {
+                statusWin = 'equal';
+            }
+            if (isEndGame) {
+                this._onEndGame();
+            }
+            return statusWin;
+        }
+
+        restartGame(log) {
+            const tiles = this.tiles;
+            tiles.forEach((tile) => {
+                tile.classList.remove(Roles.USER);
+                tile.classList.remove(Roles.COMPUTER);
+            });
+            this.choisedTiles = {
+                user: [],
+                computer: [],
+            };
+            this.restTiles = [...tiles];
+            this.endGame = false;
+            this.neuralConnection = [];
+            if (log) {
+                console.log('===========');
+                console.log('role', this.role);
+                console.log('goodNeuralConnections', this.goodNeuralConnections);
+                console.log('equalNeuralConnections', this.equalNeuralConnections);
+                console.log('badNeuralConnections', this.badNeuralConnections);
+                console.log('===========');
+            }
+        }
+
+        moveEnemy(tile, role, log) {
+            this._setTiles(tile, role);
+            this.checkGameStatus(role);
+            if (this.endGame) {
+                this.restartGame(log);
+                return null;
+            }
+            return tile;
+        }
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+        const btnMove = document.querySelector('.btn-move');
+        const btnMoveOne = document.querySelector('.btn-move-one');
+        const btnTrain = document.querySelector('.btn-train');
+        const tiles = document.querySelectorAll('.tile');
+        const tilesWrap = document.querySelector('.tiles');
+        const level = document.querySelector('.level');
+        const scores = document.querySelector('.scores');
+        const train = document.querySelector('.train');
+        const progress = document.querySelector('.progress');
+
+        const jarwisUser = new Jarwis(tiles, Roles.USER);
+        const jarwisComputer = new Jarwis(tiles, Roles.COMPUTER);
+
+
+
+        let count = 0;
+        let countTrains = 0;
+        let curLevel = 0;
+
+        const newMove = (log = false) => {
+            const tile = jarwisUser.selfMove(log, true);
+            if (tile) {
+                const tileEnemy = jarwisComputer.moveEnemy(tile, Roles.USER, log);
+                if (tileEnemy) {
+                    const tileComputer = jarwisComputer.selfMove(log, true);
+                    const tileUser = jarwisUser.moveEnemy(tileComputer, Roles.COMPUTER, log);
+                    if (tileUser) {
+                        newMove();
+                    } else if (count < 500) {
+                        count++;
+                        newMove();
+                    } else {
+                        console.log('end');
+                    }
+                } else if (count < 500) {
+                    count++;
+                    newMove();
+                } else {
+                    console.log('end');
+                }
+            }
+        }
+
+        const newMoveOne = () => {
+            const tile = jarwisUser.selfMove(true);
+            if (tile) {
+                const tileEnemy = jarwisComputer.moveEnemy(tile, Roles.USER, true);
+                if (tileEnemy) {
+                    const tileComputer = jarwisComputer.selfMove(true);
+                    const tileUser = jarwisUser.moveEnemy(tileComputer, Roles.COMPUTER, true);
+                    if (tileUser) {
+                        newMoveOne();
+                    }
+                }
+            }
+        }
+
+        const manyMoves = () => {
+            count = 0;
+            newMove();
+        }
+
+        const oneTrain = () => {
+            console.log('oneTrain', countTrains);
+            progress.value = countTrains;
+            setTimeout(() => {
+                manyMoves();
+                countTrains++;
+                if (countTrains < 10) {
+                    oneTrain();
+                } else {
+                    jarwisUser.resetCounter();
+                    jarwisComputer.resetCounter();
+                    endTrain();
+                }
+            })
+        }
+
+        const endTrain = () => {
+            tilesWrap.style.display = 'flex';
+            scores.style.display = 'block';
+            train.style.display = 'none';
+            progress.style.display = 'none';
+            curLevel++;
+            level.innerHTML = curLevel;
+        }
+
+        const startTrain = () => {
+            tilesWrap.style.display = 'none';
+            scores.style.display = 'none';
+            train.style.display = 'block';
+            progress.style.display = 'block';
+        }
+
+        const onTrain = () => {
+            countTrains = 0;
+            startTrain();
+            oneTrain();
+        }
+
+        btnMove.addEventListener('click', manyMoves);
+
+        btnMoveOne.addEventListener('click', newMoveOne);
+
+        btnTrain.addEventListener('click', onTrain);
+
+        tiles.forEach((item) => {
+            item.addEventListener('click', () => {
+                item.classList.add(Roles.USER);
+                const tileEnemy = jarwisComputer.moveEnemy(item, Roles.USER);
+                if (tileEnemy) {
+                    jarwisComputer.selfMove();
+                }
+            })
+        })
+    })
+</script>
+</body>
+</html>
